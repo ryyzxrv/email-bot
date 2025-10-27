@@ -10,7 +10,7 @@ ACCOUNTS_FILE = "accounts.json"
 SUBJECT = """Құрметті WhatsApp 
 Жеке нөмірімді тіркеу кезінде мәселе туындады, қызыл суреті бар хабарлама болды “Login not available” ол кезде менің жеке номерім болатын.
 WhatsApp бұл мәселені тез қарап, дұрыс тіркеле аламын деп үміттенемін.
-менің жеке нөмірім +({phone})
+менің жеке нөмірім ({phone})
 Мұның бәрі меннен [Junn] алғыс айту.
 """,
 
@@ -56,7 +56,7 @@ def start(update, context):
 def handle_number(update, context):
     phone_number = update.message.text.strip()
     if not phone_number.startswith("+"):
-        update.message.reply_text("Kirim nomor merah kalian ngentod (contoh: +628123456789)")
+        update.message.reply_text("Kirim Nomor Merah Kalian ```(contoh: +628123456789)```")
         return
 
     to_email = CONFIG.get("to_email")
