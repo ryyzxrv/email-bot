@@ -12,7 +12,7 @@ SUBJECT = """Құрметті WhatsApp
 WhatsApp бұл мәселені тез қарап, дұрыс тіркеле аламын деп үміттенемін.
 менің жеке нөмірім +({phone})
 Мұның бәрі меннен [Junn] алғыс айту.
-"""
+""",
 
 def load_config(path=ACCOUNTS_FILE):
     with open(path, "r", encoding="utf-8") as f:
