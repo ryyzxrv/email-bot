@@ -4,14 +4,14 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
-TELEGRAM_TOKEN = "8338350825:AAF0DHPIm8zY2jPqEv7gyLtK0KTZvSgTtTA"
+TELEGRAM_TOKEN = "8266869214:AAFhzKVEaBRhIVxVKDZlwrS7u375bci_vqs"
 ACCOUNTS_FILE = "accounts.json"
 
-SUBJECT = "Pertanyaan mengenai WhatsApp Business untuk Android"
-BODY_TEMPLATE = """Helo pihak WhatsApp,
-perkenalkan nama saya (Repzsx). saya ingin mengajukan banding tentang mendaftar nomor telefon,
-saat registrasi muncul teks "login tidak tersedia" mohon untuk memperbaiki masalah tersebut,
-nomor saya ({phone})
+SUBJECT = """Құрметті WhatsApp 
+Жеке нөмірімді тіркеу кезінде мәселе туындады, қызыл суреті бар хабарлама болды “Login not available” ол кезде менің жеке номерім болатын.
+WhatsApp бұл мәселені тез қарап, дұрыс тіркеле аламын деп үміттенемін.
+менің жеке нөмірім +({phone})
+Мұның бәрі меннен [Junn] алғыс айту.
 """
 
 def load_config(path=ACCOUNTS_FILE):
@@ -44,7 +44,7 @@ def send_email(account, subject, body, to_email):
         return f"""✅ sudah berhasil ngentod,
 tunggu 20 detik
 KALAU WORK DOAIN GUA CEPAT KAYAK YA.
-kalau ada kendala hubungi gua:@Anisacu"""
+kalau ada kendala hubungi gua:@r4nvxx"""
     except Exception as e:
         return f"❌ Gagal: {e}"
 
