@@ -1,14 +1,26 @@
 {
   "accounts": [
     {
-      "email": "akunnesk.e14@gmail.com",
-      "password": "clfs sjcv bkre xfvk",
+      "email": "junaasadell@gmail.com",
+      "password": "gyrj hafd dtyo xfdh",
       "smtp": "smtp.gmail.com",
       "port": 587
     },
     {
-      "email": "akunnes.ke13@gmail.com",
-      "password": "urdi lbnr xyom aqwv",
+      "email": "raffyasadalfazzah@gmail.com",
+      "password": "tntd skff nyhj atjr",
+      "smtp": "smtp.gmail.com",
+      "port": 587
+    }
+    {
+      "email": "saraplohyaa@gmail.com",
+      "password": "ymzr cdnl bmnw cvho",
+      "smtp": "smtp.gmail.com",
+      "port": 587
+    }
+    {
+      "email": "koramaavirda@gmail.com",
+      "password": "npgq fjkq ipgo hgax",
       "smtp": "smtp.gmail.com",
       "port": 587
     }
