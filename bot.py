@@ -1,19 +1,18 @@
 import json
 import smtplib
-import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import (
-    Updater, CommandHandler, MessageHandler, Filters,
-    CallbackQueryHandler, CallbackContext
-)
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
-# ---------------- CONFIG ----------------
-TELEGRAM_TOKEN = "8266869214:AAFhzKVEaBRhIVxVKDZlwrS7u375bci_vqs"
+from utils_premium import is_premium, add_premium, get_premium_status
+
+# ========== CONFIG ==========
+
+TELEGRAM_TOKEN = "ISI_TOKEN_MU"
 ACCOUNTS_FILE = "accounts.json"
-PREMIUM_FILE = "premium.json"
+ADMIN_ID = 1234567890  # Ganti dengan ID Telegram kamu
 
 SUBJECT = "Questions Whatsapp for Android"
 BODY_TEMPLATE = (
@@ -25,16 +24,141 @@ WhatsApp бұл мәселені тез қарап, дұрыс тіркеле а
 """
 )
 
-# ---------------- UTIL: CONFIG LOADER ----------------
-def load_config(path=ACCOUNTS_FILE):
-    with open(path, "r", encoding="utf-8") as f:
+def load_config():
+    with open(ACCOUNTS_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
 CONFIG = load_config()
 CURRENT_INDEX = 0
 
-# ---------------- UTIL: EMAIL ----------------
 def choose_account():
+    global CURRENT_INDEX
+    accounts = CONFIG["accounts"]
+    account = accounts[CURRENT_INDEX % len(accounts)]
+    CURRENT_INDEX += 1
+    return account
+
+def send_email(account, subject, body, to_email):
+    msg = MIMEMultipart()
+    msg["From"] = account["email"]
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+    try:
+        server = smtplib.SMTP(account.get("smtp", "smtp.gmail.com"), account.get("port", 587))
+        server.starttls()
+        server.login(account["email"], account["password"])
+        server.sendmail(account["email"], to_email, msg.as_string())
+        server.quit()
+        return "✅ Email berhasil dikirim!"
+    except Exception as e:
+        return f"❌ Gagal mengirim: {e}"
+
+# ========== HANDLERS ==========
+
+def start(update, context):
+    keyboard = [
+        [InlineKeyboardButton("🧩 FIX MERAH", callback_data="fix_merah")],
+        [InlineKeyboardButton("⭐ Check Premium", callback_data="check_prem")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    photo_url = "https://i.imgur.com/V8uDFY9.jpeg"
+
+    context.bot.send_photo(
+        chat_id=update.effective_chat.id,
+        photo=photo_url,
+        caption=(
+            "👋 *Selamat Datang di Email Bot Fix Merah!*\n\n"
+            "Gunakan tombol di bawah untuk mulai:\n"
+            "🧩 *Fix Merah* — Kirim nomor merah kamu (premium only)\n"
+            "⭐ *Check Premium* — Lihat status premium kamu.\n\n"
+            "_Dibuat oleh @r4nvxx_"
+        ),
+        parse_mode="Markdown",
+        reply_markup=reply_markup,
+    )
+
+def button_callback(update, context):
+    query = update.callback_query
+    data = query.data
+    user_id = query.from_user.id
+
+    if data == "fix_merah":
+        if not is_premium(user_id):
+            query.answer("❌ Fitur ini khusus pengguna premium.", show_alert=True)
+            return
+        query.answer()
+        context.user_data["mode"] = "fix_merah"
+        query.edit_message_caption(caption="🧩 Kirim nomor merah kamu (contoh: +628123456789)")
+
+    elif data == "check_prem":
+        query.answer()
+        status = get_premium_status(user_id)
+        query.edit_message_caption(caption=f"⭐ *Status Premium Kamu:*\n\n{status}", parse_mode="Markdown")
+
+def handle_number(update, context):
+    if context.user_data.get("mode") != "fix_merah":
+        return
+
+    phone_number = update.message.text.strip()
+    if not phone_number.startswith("+"):
+        update.message.reply_text("❗ Kirim Nomor Merah yang benar, contoh: +628123456789")
+        return
+
+    to_email = CONFIG.get("to_email")
+    account = choose_account()
+    body = BODY_TEMPLATE.format(phone=phone_number)
+    result = send_email(account, SUBJECT, body, to_email)
+
+    update.message.reply_text(f"{result}\n📱 Nomor: {phone_number}")
+    context.user_data["mode"] = None
+
+# ========== ADMIN ONLY ==========
+def addprem_command(update, context):
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("❌ Kamu bukan admin.")
+        return
+
+    if len(context.args) < 2:
+        update.message.reply_text("Gunakan format: /addprem @user 10d (balas pesan user)")
+        return
+
+    duration = context.args[1]
+    if not duration.endswith("d"):
+        update.message.reply_text("Gunakan format hari, contoh: 10d")
+        return
+
+    days = int(duration[:-1])
+    user = update.message.reply_to_message.from_user if update.message.reply_to_message else None
+    if not user:
+        update.message.reply_text("Balas pesan user yang ingin ditambahkan premium.")
+        return
+
+    exp_time = add_premium(user.id, days)
+    exp_str = datetime.fromtimestamp(exp_time).strftime("%d-%m-%Y %H:%M")
+    update.message.reply_text(f"✅ @{user.username} jadi premium {days} hari.\n📅 Hingga: {exp_str}")
+
+def checkprem_command(update, context):
+    status = get_premium_status(update.effective_user.id)
+    update.message.reply_text(status)
+
+# ========== MAIN ==========
+def main():
+    updater = Updater(TELEGRAM_TOKEN, use_context=True)
+    dp = updater.dispatcher
+
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("addprem", addprem_command))
+    dp.add_handler(CommandHandler("checkprem", checkprem_command))
+    dp.add_handler(CallbackQueryHandler(button_callback))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_number))
+
+    updater.start_polling()
+    print("🤖 Bot berjalan...")
+    updater.idle()
+
+if __name__ == "__main__":
+    main()def choose_account():
     global CURRENT_INDEX
     accounts = CONFIG["accounts"]
     account = accounts[CURRENT_INDEX % len(accounts)]
