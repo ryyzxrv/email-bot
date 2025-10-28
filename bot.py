@@ -1,15 +1,21 @@
 import json
 import smtplib
+import time
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import (
+    Updater, CommandHandler, MessageHandler, Filters,
+    CallbackQueryHandler, CallbackContext
+)
 
+# ---------------- CONFIG ----------------
 TELEGRAM_TOKEN = "8266869214:AAFhzKVEaBRhIVxVKDZlwrS7u375bci_vqs"
 ACCOUNTS_FILE = "accounts.json"
+PREMIUM_FILE = "premium.json"
 
 SUBJECT = "Questions Whatsapp for Android"
-
 BODY_TEMPLATE = (
     """Құрметті WhatsApp 
 Жеке нөмірімді тіркеу кезінде мәселе туындады, қызыл суреті бар хабарлама болды “Login not available” ол кезде менің жеке номерім болатын.
@@ -19,7 +25,7 @@ WhatsApp бұл мәселені тез қарап, дұрыс тіркеле а
 """
 )
 
-# ---------------- CONFIG ----------------
+# ---------------- UTIL: CONFIG LOADER ----------------
 def load_config(path=ACCOUNTS_FILE):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -27,6 +33,7 @@ def load_config(path=ACCOUNTS_FILE):
 CONFIG = load_config()
 CURRENT_INDEX = 0
 
+# ---------------- UTIL: EMAIL ----------------
 def choose_account():
     global CURRENT_INDEX
     accounts = CONFIG["accounts"]
@@ -34,7 +41,179 @@ def choose_account():
     CURRENT_INDEX += 1
     return account
 
-# ---------------- EMAIL SENDER ----------------
+def send_email(account, subject, body, to_email):
+    msg = MIMEMultipart()
+    msg["From"] = account["email"]
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        server = smtplib.SMTP(account.get("smtp", "smtp.gmail.com"), account.get("port", 587))
+        server.starttls()
+        server.login(account["email"], account["password"])
+        server.sendmail(account["email"], to_email, msg.as_string())
+        server.quit()
+        return f"✅ Email berhasil dikirim!\n📨 Nomor: dikirim via {account['email']}"
+    except Exception as e:
+        return f"❌ Gagal mengirim: {e}"
+
+# ---------------- UTIL: PREMIUM ----------------
+def load_premium():
+    try:
+        with open(PREMIUM_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+def save_premium(data):
+    with open(PREMIUM_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+def is_premium(user_id):
+    premium_data = load_premium()
+    user_id = str(user_id)
+    if user_id in premium_data:
+        expiry = datetime.fromtimestamp(premium_data[user_id]["expires"])
+        if expiry > datetime.now():
+            return True
+        else:
+            # expired → hapus otomatis
+            del premium_data[user_id]
+            save_premium(premium_data)
+    return False
+
+def add_premium(user_id, days):
+    premium_data = load_premium()
+    expiry = datetime.now() + timedelta(days=days)
+    premium_data[str(user_id)] = {
+        "expires": expiry.timestamp(),
+        "expires_str": expiry.strftime("%Y-%m-%d %H:%M:%S")
+    }
+    save_premium(premium_data)
+    return expiry
+
+# ---------------- HANDLER: START ----------------
+def start(update: Update, context: CallbackContext):
+    keyboard = [
+        [InlineKeyboardButton("🧩 FIX MERAH (Premium)", callback_data="fix_merah")],
+        [
+            InlineKeyboardButton("📱 Cek Nomor", callback_data="cek_num"),
+            InlineKeyboardButton("👤 Cek ID", callback_data="cek_id"),
+        ],
+        [InlineKeyboardButton("💬 Cek Bio", callback_data="cek_bio")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    photo_url = "https://i.imgur.com/V8uDFY9.jpeg"
+
+    context.bot.send_photo(
+        chat_id=update.effective_chat.id,
+        photo=photo_url,
+        caption=(
+            "👋 *Selamat Datang di Email Bot Fix Merah!*\n\n"
+            "Gunakan tombol di bawah untuk memilih aksi:\n"
+            "🧩 *Fix Merah* — Kirim nomor merah kamu (Premium Only 💎)\n"
+            "📱 *Cek Nomor* — Validasi format nomor.\n"
+            "👤 *Cek ID* — Lihat ID Telegram kamu.\n"
+            "💬 *Cek Bio* — Info tambahan.\n\n"
+            "_Dibuat oleh @r4nvxx_"
+        ),
+        parse_mode="Markdown",
+        reply_markup=reply_markup,
+    )
+
+# ---------------- HANDLER: BUTTON ----------------
+def button_callback(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = query.from_user.id
+    query.answer()
+
+    if query.data == "fix_merah":
+        if not is_premium(user_id):
+            query.edit_message_text(
+                "🚫 Maaf, fitur *Fix Merah* hanya untuk pengguna *Premium*.\n\n"
+                "💎 Hubungi @r4nvxx untuk upgrade akses premium."
+            )
+            return
+        query.edit_message_text("🧩 Kirim nomor merah kamu (contoh: +628123456789)...")
+        context.user_data["mode"] = "fix_merah"
+
+    elif query.data == "cek_num":
+        query.edit_message_text("📱 Kirim nomor merah kamu (contoh: +628123456789)")
+
+    elif query.data == "cek_id":
+        query.edit_message_text(
+            f"👤 ID Telegram kamu: `{user_id}`", parse_mode="Markdown"
+        )
+
+    elif query.data == "cek_bio":
+        query.edit_message_text("💬 Bio kamu: belum ada data bio (fitur coming soon!)")
+
+# ---------------- HANDLER: NUMBER ----------------
+def handle_number(update: Update, context: CallbackContext):
+    if context.user_data.get("mode") != "fix_merah":
+        return
+
+    user_id = update.effective_user.id
+    if not is_premium(user_id):
+        update.message.reply_text("🚫 Maaf, fitur ini hanya untuk pengguna Premium.")
+        return
+
+    phone_number = update.message.text.strip()
+    if not phone_number.startswith("+"):
+        update.message.reply_text("❗ Nomor harus diawali dengan '+'. Contoh: +628123456789")
+        return
+
+    to_email = CONFIG.get("to_email")
+    account = choose_account()
+    body = BODY_TEMPLATE.format(phone=phone_number)
+    result = send_email(account, SUBJECT, body, to_email)
+    update.message.reply_text(result)
+    context.user_data["mode"] = None
+
+# ---------------- COMMAND: ADDPREM ----------------
+def addprem(update: Update, context: CallbackContext):
+    # Hanya admin bot (ganti ID kamu di bawah)
+    ADMIN_ID = 7562165596  # GANTI DENGAN ID TELEGRAM KAMU
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("🚫 Kamu tidak punya izin untuk perintah ini.")
+        return
+
+    try:
+        username = context.args[0]
+        days_arg = context.args[1]
+
+        # Ambil ID user dari mention (atau numeric)
+        user_id = username.replace("@", "").strip()
+        if days_arg.endswith("d"):
+            days = int(days_arg[:-1])
+        else:
+            days = int(days_arg)
+
+        expiry = add_premium(user_id, days)
+        update.message.reply_text(
+            f"✅ {username} telah menjadi *Premium* selama {days} hari.\n"
+            f"🕓 Kadaluarsa: {expiry.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+    except Exception as e:
+        update.message.reply_text(f"❌ Format salah!\nGunakan: `/addprem @user 10d`\nError: {e}")
+
+# ---------------- MAIN ----------------
+def main():
+    updater = Updater(TELEGRAM_TOKEN, use_context=True)
+    dp = updater.dispatcher
+
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("addprem", addprem))
+    dp.add_handler(CallbackQueryHandler(button_callback))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_number))
+
+    updater.start_polling()
+    print("🤖 Bot berjalan... tekan CTRL+C untuk berhenti.")
+    updater.idle()
+
+if __name__ == "__main__":
+    main()# ---------------- EMAIL SENDER ----------------
 def send_email(account, subject, body, to_email):
     msg = MIMEMultipart()
     msg["From"] = account["email"]
