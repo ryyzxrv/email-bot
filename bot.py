@@ -58,6 +58,121 @@ Kalau ada kendala, hubungi: @r4nvxx"""
 # ---------------- HANDLERS ----------------
 
 def start(update, context):
+    keyboard = [
+        [InlineKeyboardButton("🧩 FIX MERAH", callback_data="fix_merah")],
+        [
+            InlineKeyboardButton("📱 Cek Nomor", callback_data="cek_num"),
+            InlineKeyboardButton("👤 Cek ID", callback_data="cek_id"),
+        ],
+        [InlineKeyboardButton("💬 Cek Bio", callback_data="cek_bio")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    photo_url = "https://i.imgur.com/V8uDFY9.jpeg"
+
+    context.bot.send_photo(
+        chat_id=update.effective_chat.id,
+        photo=photo_url,
+        caption=(
+            "👋 *Selamat Datang di Email Bot Fix Merah!*\n\n"
+            "Gunakan tombol di bawah untuk memilih aksi:\n"
+            "🧩 *Fix Merah* — Kirim nomor merah kamu.\n"
+            "📱 *Cek Nomor* — Cek format nomor kamu.\n"
+            "👤 *Cek ID* — Lihat ID Telegram kamu.\n"
+            "💬 *Cek Bio* — Info tambahan.\n\n"
+            "_Dibuat oleh @r4nvxx_"
+        ),
+        parse_mode="Markdown",
+        reply_markup=reply_markup,
+    )
+
+# ---- Callback tombol ----
+def button_callback(update, context):
+    query = update.callback_query
+    query.answer()
+
+    if query.data == "fix_merah":
+        context.user_data["mode"] = "fix_merah"
+        query.edit_message_caption(
+            caption="🔴 Kirim *Nomor Merah* kamu di sini (contoh: +628123456789)",
+            parse_mode="Markdown",
+        )
+
+    elif query.data == "cek_num":
+        query.edit_message_caption(
+            caption="📱 Masukkan nomor kamu untuk dicek formatnya!",
+            parse_mode="Markdown",
+        )
+
+    elif query.data == "cek_id":
+        user_id = query.from_user.id
+        query.edit_message_caption(
+            caption=f"👤 ID Telegram kamu: `{user_id}`",
+            parse_mode="Markdown",
+        )
+
+    elif query.data == "cek_bio":
+        query.edit_message_caption(
+            caption="💬 Bot ini dibuat untuk bantu kirim email fix merah otomatis.\n\nKontak dev: @r4nvxx",
+            parse_mode="Markdown",
+        )
+
+# ---- Handler nomor ----
+def handle_number(update, context):
+    if context.user_data.get("mode") != "fix_merah":
+        return
+
+    phone_number = update.message.text.strip()
+    if not phone_number.startswith("+"):
+        update.message.reply_text("❗ Kirim Nomor Merah yang benar, contoh: +628123456789")
+        return
+
+    to_email = CONFIG.get("to_email")
+    account = choose_account()
+    body = BODY_TEMPLATE.format(phone=phone_number)
+    result = send_email(account, SUBJECT, body, to_email)
+
+    update.message.reply_text(f"{result}\n📱 Nomor: {phone_number}")
+    context.user_data["mode"] = None  # reset mode
+
+# ---------------- MAIN ----------------
+def main():
+    updater = Updater(TELEGRAM_TOKEN, use_context=True)
+    dp = updater.dispatcher
+
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CallbackQueryHandler(button_callback))
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_number))
+
+    updater.start_polling()
+    print("🤖 Bot berjalan... tekan CTRL+C untuk berhenti.")
+    updater.idle()
+
+if __name__ == "__main__":
+    main()# ---------------- EMAIL SENDER ----------------
+def send_email(account, subject, body, to_email):
+    msg = MIMEMultipart()
+    msg["From"] = account["email"]
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(body, "plain"))
+
+    try:
+        server = smtplib.SMTP(account.get("smtp", "smtp.gmail.com"), account.get("port", 587))
+        server.starttls()
+        server.login(account["email"], account["password"])
+        server.sendmail(account["email"], to_email, msg.as_string())
+        server.quit()
+        return f"""✅ Sudah berhasil terkirim.
+Tunggu 20 detik...
+Kalau berhasil, doain yang bikin cepat kaya 😎
+Kalau ada kendala, hubungi: @r4nvxx"""
+    except Exception as e:
+        return f"❌ Gagal mengirim: {e}"
+
+# ---------------- HANDLERS ----------------
+
+def start(update, context):
     # Tombol menu utama
     keyboard = [
         [InlineKeyboardButton("🧩 FIX MERAH", callback_data="fix_merah")],
