@@ -39,4 +39,9 @@ def get_premium_status(user_id):
         return "❌ Masa premium kamu sudah berakhir."
     sisa_hari = int((exp - now) / 86400)
     exp_str = datetime.fromtimestamp(exp).strftime("%d-%m-%Y %H:%M")
+    return f"✅ Kamu premium.\n📅 Berlaku sampai: {exp_str}\n⏳ Sisa: {sisa_hari} hari"    now = time.time()
+    if exp < now:
+        return "❌ Masa premium kamu sudah berakhir."
+    sisa_hari = int((exp - now) / 86400)
+    exp_str = datetime.fromtimestamp(exp).strftime("%d-%m-%Y %H:%M")
     return f"✅ Kamu premium.\n📅 Berlaku sampai: {exp_str}\n⏳ Sisa: {sisa_hari} hari"
