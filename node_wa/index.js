@@ -1,40 +1,61 @@
-import makeWASocket, { useMultiFileAuthState, DisconnectReason } from "@whiskeysockets/baileys";
-import Pino from "pino";
-import fs from "fs";
-import axios from "axios";
-import chalk from "chalk";
-import config from "./config.js";
+import { Client, LocalAuth } from "whatsapp-web.js";
+import express from "express";
+import fetch from "node-fetch";
+import { telegramBotUrl } from "./config.js";
 
-let waClient = null;
+const app = express();
+app.use(express.json());
 
-async function startWhatsAppClient() {
-  console.log(chalk.cyan("🔄 Menghubungkan ke WhatsApp..."));
-  const { state, saveCreds } = await useMultiFileAuthState(config.sessionName);
+// Inisialisasi client WA dengan LocalAuth (nyimpen sesi otomatis)
+const client = new Client({
+  authStrategy: new LocalAuth({ dataPath: "./session" }),
+  webVersionCache: {
+    type: "remote",
+    remotePath:
+      "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2410.1.html",
+  },
+});
 
-  waClient = makeWASocket({
-    printQRInTerminal: true,
-    browser: ["Ubuntu", "Chrome", "110.0"],
-    logger: Pino({ level: "silent" }),
-    auth: state,
-  });
+// Saat butuh pairing code (buat login pertama kali)
+client.on("qr", async (qr) => {
+  console.log("📲 Scan QR Code / gunakan pairing code WhatsApp...");
+});
 
-  waClient.ev.on("creds.update", saveCreds);
+// Kalau kamu mau pairing lewat kode (bukan QR)
+client.on("ready", async () => {
+  console.log("✅ WhatsApp berhasil tersambung!");
+});
 
-  waClient.ev.on("connection.update", ({ connection, lastDisconnect }) => {
-    if (connection === "close") {
-      const reason = lastDisconnect?.error?.output?.statusCode;
-      if (reason !== DisconnectReason.loggedOut) {
-        console.log(chalk.yellow("⚠️ Terputus, mencoba ulang..."));
-        startWhatsAppClient();
-      } else {
-        console.log(chalk.red("❌ Logout. Hapus session dan scan ulang."));
-      }
-    } else if (connection === "open") {
-      console.log(chalk.green("✅ Berhasil tersambung ke WhatsApp!"));
-    }
-  });
-}
+// Saat login berhasil
+client.on("authenticated", () => {
+  console.log("🔐 Autentikasi berhasil!");
+});
 
+// Saat logout
+client.on("disconnected", (reason) => {
+  console.log("❌ WhatsApp terputus:", reason);
+});
+
+// Endpoint buat cek status
+app.get("/status", (req, res) => {
+  res.json({ status: client.info ? "connected" : "disconnected" });
+});
+
+// Endpoint untuk kirim pesan dari Telegram ke WhatsApp
+app.post("/send", async (req, res) => {
+  const { number, message } = req.body;
+  try {
+    const chatId = number.replace(/\D/g, "") + "@c.us";
+    await client.sendMessage(chatId, message);
+    res.json({ success: true, msg: "Pesan terkirim ke WA" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+client.initialize();
+app.listen(5000, () => console.log("🚀 Server jalan di http://localhost:5000"));
 /**
  * Cek bio WA
  */
