@@ -2,17 +2,23 @@ import json
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 
 TELEGRAM_TOKEN = "8266869214:AAFhzKVEaBRhIVxVKDZlwrS7u375bci_vqs"
 ACCOUNTS_FILE = "accounts.json"
 
-SUBJECT = """Құрметті WhatsApp 
+SUBJECT = """
+"""
+
+BODY_TEMPLATE = (
+    """Құрметті WhatsApp 
 Жеке нөмірімді тіркеу кезінде мәселе туындады, қызыл суреті бар хабарлама болды “Login not available” ол кезде менің жеке номерім болатын.
 WhatsApp бұл мәселені тез қарап, дұрыс тіркеле аламын деп үміттенемін.
 менің жеке нөмірім ({phone})
 Мұның бәрі меннен [Junn] алғыс айту.
-""",
+"""
+)
 
 def load_config(path=ACCOUNTS_FILE):
     with open(path, "r", encoding="utf-8") as f:
@@ -50,8 +56,33 @@ kalau ada kendala hubungi gua:@r4nvxx"""
 
 # Handler start → balasan sesuai permintaan
 def start(update, context):
-    update.message.reply_text("Kirim nomor merah kalian ngentod")
+    keyboard = [
+        [
+            InlineKeyboardButton("📱 OWNER", callback_data="cek_num"),
+            InlineKeyboardButton("🧩 FIX MERAH", callback_data="fix_merah")
+        ],
+        [
+            InlineKeyboardButton("👤 CEK ID", callback_data="cek_id"),
+            InlineKeyboardButton("💬 CEK BAPAKQ", callback_data="cek_bio")
+        ]
+    ]
 
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    text = (
+        "🐱 *BANDING RAYYZ*\n"
+        "━━━━━━━━━━━━━━━━━━━\n"
+        "📜 *Script Name:* Banding By Rayyzxer\n"
+        "👑 *Owner:* @r4vnnx\n"
+        "⚙️ *Version:* 1.0.0\n"
+        "🕒 *Runtime:* 0 Jam 00 Menit 00 Detik\n\n"
+        "Tekan tombol di bawah untuk mulai:"
+    )
+
+    update.message.reply_text(
+        text,
+        parse_mode="Markdown",
+        reply_markup=reply_markup
+            )
 # Handler nomor
 def handle_number(update, context):
     phone_number = update.message.text.strip()
