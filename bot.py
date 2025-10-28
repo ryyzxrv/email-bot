@@ -3,27 +3,24 @@ import smtplib
 from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
-
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, CallbackContext
 from utils_premium import is_premium, add_premium, get_premium_status
 
 # ========== CONFIG ==========
-
 TELEGRAM_TOKEN = "8266869214:AAFhzKVEaBRhIVxVKDZlwrS7u375bci_vqs"
 ACCOUNTS_FILE = "accounts.json"
 ADMIN_ID = 7562165596  # Ganti dengan ID Telegram kamu
 
 SUBJECT = "Questions Whatsapp for Android"
-BODY_TEMPLATE = (
-    """Құрметті WhatsApp 
+BODY_TEMPLATE = """Құрметті WhatsApp 
 Жеке нөмірімді тіркеу кезінде мәселе туындады, қызыл суреті бар хабарлама болды “Login not available” ол кезде менің жеке номерім болатын.
 WhatsApp бұл мәселені тез қарап, дұрыс тіркеле аламын деп үміттенемін.
 менің жеке нөмірім [{phone}]
 Мұның бәрі меннен [Junn] алғыс айту.
 """
-)
 
+# ========== EMAIL FUNCTIONS ==========
 def load_config():
     with open(ACCOUNTS_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -54,11 +51,10 @@ def send_email(account, subject, body, to_email):
     except Exception as e:
         return f"❌ Gagal mengirim: {e}"
 
-# ========== HANDLERS ==========
-
+# ========== COMMAND HANDLERS ==========
 def start(update, context):
     keyboard = [
-        [InlineKeyboardButton("🧩 FIX MERAH", callback_data="fix_merah")],
+        [InlineKeyboardButton("🧩 FIX MERAH (Premium Only)", callback_data="fix_merah")],
         [InlineKeyboardButton("⭐ Check Premium", callback_data="check_prem")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -69,8 +65,8 @@ def start(update, context):
         photo=photo_url,
         caption=(
             "👋 *Selamat Datang di Email Bot Fix Merah!*\n\n"
-            "Gunakan tombol di bawah untuk mulai:\n"
-            "🧩 *Fix Merah* — Kirim nomor merah kamu (premium only)\n"
+            "Gunakan tombol di bawah:\n"
+            "🧩 *Fix Merah* — Kirim nomor merah kamu (khusus premium)\n"
             "⭐ *Check Premium* — Lihat status premium kamu.\n\n"
             "_Dibuat oleh @r4nvxx_"
         ),
@@ -113,7 +109,7 @@ def handle_number(update, context):
     update.message.reply_text(f"{result}\n📱 Nomor: {phone_number}")
     context.user_data["mode"] = None
 
-# ========== ADMIN ONLY ==========
+# ========== ADMIN COMMANDS ==========
 def addprem_command(update, context):
     if update.effective_user.id != ADMIN_ID:
         update.message.reply_text("❌ Kamu bukan admin.")
@@ -158,133 +154,7 @@ def main():
     updater.idle()
 
 if __name__ == "__main__":
-    main()def choose_account():
-    global CURRENT_INDEX
-    accounts = CONFIG["accounts"]
-    account = accounts[CURRENT_INDEX % len(accounts)]
-    CURRENT_INDEX += 1
-    return account
-
-def send_email(account, subject, body, to_email):
-    msg = MIMEMultipart()
-    msg["From"] = account["email"]
-    msg["To"] = to_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
-
-    try:
-        server = smtplib.SMTP(account.get("smtp", "smtp.gmail.com"), account.get("port", 587))
-        server.starttls()
-        server.login(account["email"], account["password"])
-        server.sendmail(account["email"], to_email, msg.as_string())
-        server.quit()
-        return f"✅ Email berhasil dikirim!\n📨 Nomor: dikirim via {account['email']}"
-    except Exception as e:
-        return f"❌ Gagal mengirim: {e}"
-
-# ---------------- UTIL: PREMIUM ----------------
-def load_premium():
-    try:
-        with open(PREMIUM_FILE, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
-
-def save_premium(data):
-    with open(PREMIUM_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-def is_premium(user_id):
-    premium_data = load_premium()
-    user_id = str(user_id)
-    if user_id in premium_data:
-        expiry = datetime.fromtimestamp(premium_data[user_id]["expires"])
-        if expiry > datetime.now():
-            return True
-        else:
-            # expired → hapus otomatis
-            del premium_data[user_id]
-            save_premium(premium_data)
-    return False
-
-def add_premium(user_id, days):
-    premium_data = load_premium()
-    expiry = datetime.now() + timedelta(days=days)
-    premium_data[str(user_id)] = {
-        "expires": expiry.timestamp(),
-        "expires_str": expiry.strftime("%Y-%m-%d %H:%M:%S")
-    }
-    save_premium(premium_data)
-    return expiry
-
-# ---------------- HANDLER: START ----------------
-def start(update: Update, context: CallbackContext):
-    keyboard = [
-        [InlineKeyboardButton("🧩 FIX MERAH (Premium)", callback_data="fix_merah")],
-        [
-            InlineKeyboardButton("📱 Cek Nomor", callback_data="cek_num"),
-            InlineKeyboardButton("👤 Cek ID", callback_data="cek_id"),
-        ],
-        [InlineKeyboardButton("💬 Cek Bio", callback_data="cek_bio")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    photo_url = "https://i.imgur.com/V8uDFY9.jpeg"
-
-    context.bot.send_photo(
-        chat_id=update.effective_chat.id,
-        photo=photo_url,
-        caption=(
-            "👋 *Selamat Datang di Email Bot Fix Merah!*\n\n"
-            "Gunakan tombol di bawah untuk memilih aksi:\n"
-            "🧩 *Fix Merah* — Kirim nomor merah kamu (Premium Only 💎)\n"
-            "📱 *Cek Nomor* — Validasi format nomor.\n"
-            "👤 *Cek ID* — Lihat ID Telegram kamu.\n"
-            "💬 *Cek Bio* — Info tambahan.\n\n"
-            "_Dibuat oleh @r4nvxx_"
-        ),
-        parse_mode="Markdown",
-        reply_markup=reply_markup,
-    )
-
-# ---------------- HANDLER: BUTTON ----------------
-def button_callback(update: Update, context: CallbackContext):
-    query = update.callback_query
-    user_id = query.from_user.id
-    query.answer()
-
-    if query.data == "fix_merah":
-        if not is_premium(user_id):
-            query.edit_message_text(
-                "🚫 Maaf, fitur *Fix Merah* hanya untuk pengguna *Premium*.\n\n"
-                "💎 Hubungi @r4nvxx untuk upgrade akses premium."
-            )
-            return
-        query.edit_message_text("🧩 Kirim nomor merah kamu (contoh: +628123456789)...")
-        context.user_data["mode"] = "fix_merah"
-
-    elif query.data == "cek_num":
-        query.edit_message_text("📱 Kirim nomor merah kamu (contoh: +628123456789)")
-
-    elif query.data == "cek_id":
-        query.edit_message_text(
-            f"👤 ID Telegram kamu: `{user_id}`", parse_mode="Markdown"
-        )
-
-    elif query.data == "cek_bio":
-        query.edit_message_text("💬 Bio kamu: belum ada data bio (fitur coming soon!)")
-
-# ---------------- HANDLER: NUMBER ----------------
-def handle_number(update: Update, context: CallbackContext):
-    if context.user_data.get("mode") != "fix_merah":
-        return
-
-    user_id = update.effective_user.id
-    if not is_premium(user_id):
-        update.message.reply_text("🚫 Maaf, fitur ini hanya untuk pengguna Premium.")
-        return
-
-    phone_number = update.message.text.strip()
-    if not phone_number.startswith("+"):
+    main()th("+"):
         update.message.reply_text("❗ Nomor harus diawali dengan '+'. Contoh: +628123456789")
         return
 
