@@ -10,16 +10,16 @@ from utils_premium import is_premium, add_premium, get_premium_status
 
 # ========== CONFIG ==========
 
-TELEGRAM_TOKEN = "ISI_TOKEN_MU"
+TELEGRAM_TOKEN = "8266869214:AAFhzKVEaBRhIVxVKDZlwrS7u375bci_vqs"
 ACCOUNTS_FILE = "accounts.json"
-ADMIN_ID = 1234567890  # Ganti dengan ID Telegram kamu
+ADMIN_ID = 7562165596  # Ganti dengan ID Telegram kamu
 
 SUBJECT = "Questions Whatsapp for Android"
 BODY_TEMPLATE = (
     """Құрметті WhatsApp 
 Жеке нөмірімді тіркеу кезінде мәселе туындады, қызыл суреті бар хабарлама болды “Login not available” ол кезде менің жеке номерім болатын.
 WhatsApp бұл мәселені тез қарап, дұрыс тіркеле аламын деп үміттенемін.
-менің жеке нөмірім ({phone})
+менің жеке нөмірім [{phone}]
 Мұның бәрі меннен [Junn] алғыс айту.
 """
 )
